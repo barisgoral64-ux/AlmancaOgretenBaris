@@ -32,16 +32,44 @@ jobs:
       - name: Unzip Android project
         run: unzip -o germanai-android-auth-fixed.zip
 
-      - name: Show files
-        run: ls -R
+      - name: Show project files
+        run: |
+          echo "ROOT:"
+          ls -la
+          echo ""
+          echo "PROJECT:"
+          ls -la germanai-android
+          echo ""
+          echo "APP:"
+          ls -la germanai-android/app
 
       - name: Build Debug APK
+        id: build_apk
         working-directory: germanai-android
-        run: gradle assembleDebug --stacktrace --no-daemon
+        continue-on-error: true
+        run: |
+          gradle assembleDebug --stacktrace --info --no-daemon 2>&1 | tee build.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          exit 0
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: germanai-android/build.log
+          if-no-files-found: error
 
       - name: Upload Debug APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: germanai-android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          if-no-files-found: ignore
+
+      - name: Fail if build failed
+        if: steps.build_apk.outputs.exit_code != '0'
+        run: |
+          echo "APK build failed. Download the build-log artifact and inspect the real Gradle error."
+          exit 1
